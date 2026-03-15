@@ -1,0 +1,16 @@
+-- Создание полнотекстового каталога
+CREATE FULLTEXT CATALOG FTC_Teplo AS DEFAULT;
+GO
+
+-- Полнотекстовые индексы
+CREATE FULLTEXT INDEX ON Articles(Title, Description, Content) 
+    KEY INDEX PK_Articles WITH STOPLIST = SYSTEM;
+GO
+
+CREATE FULLTEXT INDEX ON Notes(Title, Text) 
+    KEY INDEX PK_Notes WITH STOPLIST = SYSTEM;
+GO
+
+CREATE FULLTEXT INDEX ON Templates(Title, Text) 
+    KEY INDEX PK_Templates WITH STOPLIST = SYSTEM;
+GO

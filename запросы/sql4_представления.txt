@@ -1,0 +1,60 @@
+-- Активные цели пользователя
+CREATE VIEW vw_ActiveGoals
+AS
+SELECT 
+    g.IdGoal,
+    g.IdUser,
+    g.Title,
+    g.Description,
+    g.GoalType,
+    g.Priority,
+    g.Deadline,
+    g.Progress,
+    g.DaysUntilDeadline,
+    g.IsOverdue,
+    COUNT(t.IdTask) AS TotalTasks,
+    SUM(CASE WHEN t.Status = 'Completed' THEN 1 ELSE 0 END) AS CompletedTasks
+FROM Goals g
+LEFT JOIN Tasks t ON g.IdGoal = t.IdGoal
+WHERE g.Status IN ('Created', 'InProgress')
+  AND g.IsActive = 1
+GROUP BY g.IdGoal, g.IdUser, g.Title, g.Description, g.GoalType, 
+         g.Priority, g.Deadline, g.Progress, g.DaysUntilDeadline, g.IsOverdue;
+GO
+
+-- Статистика привычек за неделю
+CREATE VIEW vw_WeeklyHabits
+AS
+SELECT 
+    t.IdUser,
+    t.IdTracker,
+    t.Title AS TrackerTitle,
+    h.HabitDate,
+    h.Status,
+    h.Value
+FROM Trackers t
+INNER JOIN Habits h ON t.IdTracker = h.IdTracker
+WHERE h.HabitDate >= DATEADD(DAY, -7, GETDATE())
+  AND h.HabitDate <= GETDATE();
+GO
+
+-- Популярные статьи
+CREATE VIEW vw_PopularArticles
+AS
+SELECT TOP 100
+    a.IdArticle,
+    a.Title,
+    a.Description,
+    a.PublishedAt,
+    u.UserName AS AuthorName,
+    a.Views,
+    COUNT(DISTINCT l.IdUser) AS LikesCount,
+    COUNT(DISTINCT f.IdUser) AS FavsCount
+FROM Articles a
+INNER JOIN Users u ON a.Author = u.IdUser
+LEFT JOIN Likes l ON a.IdArticle = l.IdArticle
+LEFT JOIN Favorites f ON a.IdArticle = f.IdArticle
+WHERE a.Status = 'Published'
+GROUP BY a.IdArticle, a.Title, a.Description, a.PublishedAt, u.UserName, a.Views
+ORDER BY a.Views DESC, LikesCount DESC;
+GO

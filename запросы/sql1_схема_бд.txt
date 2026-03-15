@@ -1,0 +1,58 @@
+-- Создание базы данных
+CREATE DATABASE TeploDB
+ON PRIMARY 
+(
+    NAME = N'TeploDB_Data',
+    FILENAME = N'D:\Data\TeploDB_Data.mdf',
+    SIZE = 100MB,
+    MAXSIZE = UNLIMITED,
+    FILEGROWTH = 100MB
+)
+LOG ON
+(
+    NAME = N'TeploDB_Log',
+    FILENAME = N'D:\Logs\TeploDB_Log.ldf',
+    SIZE = 50MB,
+    MAXSIZE = UNLIMITED,
+    FILEGROWTH = 50MB
+);
+GO
+
+USE TeploDB;
+GO
+
+-- Создание файловых групп для партиционирования
+ALTER DATABASE TeploDB ADD FILEGROUP FG_Habits_2024;
+ALTER DATABASE TeploDB ADD FILEGROUP FG_Habits_2025;
+ALTER DATABASE TeploDB ADD FILEGROUP FG_Habits_Archive;
+
+-- Добавление файлов в файловые группы
+ALTER DATABASE TeploDB ADD FILE 
+(
+    NAME = N'Habits_2024_Data',
+    FILENAME = N'D:\Data\Habits_2024.ndf',
+    SIZE = 500MB,
+    MAXSIZE = UNLIMITED,
+    FILEGROWTH = 100MB
+) TO FILEGROUP FG_Habits_2024;
+
+ALTER DATABASE TeploDB ADD FILE 
+(
+    NAME = N'Habits_2025_Data',
+    FILENAME = N'D:\Data\Habits_2025.ndf',
+    SIZE = 500MB,
+    MAXSIZE = UNLIMITED,
+    FILEGROWTH = 100MB
+) TO FILEGROUP FG_Habits_2025;
+
+ALTER DATABASE TeploDB ADD FILE 
+(
+    NAME = N'Habits_Archive_Data',
+    FILENAME = N'D:\Data\Habits_Archive.ndf',
+    SIZE = 1GB,
+    MAXSIZE = UNLIMITED,
+    FILEGROWTH = 200MB
+) TO FILEGROUP FG_Habits_Archive;
+GO
+
+

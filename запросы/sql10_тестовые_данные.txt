@@ -1,0 +1,24 @@
+-- Добавление тестовых пользователей
+INSERT INTO Users (UserName, Email, Phone, PasswordHash, IsAuthor, Birthday)
+VALUES 
+    ('Анна', 'anna@example.com', '+79001234567', HASHBYTES('SHA2_256', 'password123'), 1, '1990-05-15'),
+    ('Иван', 'ivan@example.com', '+79007654321', HASHBYTES('SHA2_256', 'password123'), 0, '1985-12-20'),
+    ('Мария', 'maria@example.com', NULL, HASHBYTES('SHA2_256', 'password123'), 1, '1995-03-10');
+GO
+
+-- Добавление иконок
+INSERT INTO Icons (Name, Resource, Color, Category)
+VALUES 
+    ('Спорт', '/icons/sport.svg', '#FF5733', 'activity'),
+    ('Вода', '/icons/water.svg', '#33A1FF', 'health'),
+    ('Медитация', '/icons/meditation.svg', '#33FF57', 'mindfulness'),
+    ('Сон', '/icons/sleep.svg', '#A133FF', 'health');
+GO
+
+-- Добавление тем для статей
+INSERT INTO Themes (Title, Description, Slug)
+VALUES 
+    ('Здоровье', 'Статьи о физическом здоровье', 'health'),
+    ('Психология', 'Статьи о ментальном здоровье', 'psychology'),
+    ('Продуктивность', 'Как быть эффективным', 'productivity');
+GO

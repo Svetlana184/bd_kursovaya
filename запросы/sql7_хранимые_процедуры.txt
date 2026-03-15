@@ -1,0 +1,121 @@
+-- Процедура для получения дэшборда пользователя
+CREATE PROCEDURE sp_GetUserDashboard
+    @UserId INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    -- Сегодняшние привычки
+    SELECT 
+        t.IdTracker,
+        t.Title,
+        t.TrackerType,
+        t.GoalValue,
+        t.GoalUnit,
+        h.Status,
+        h.Value,
+        h.Comment
+    FROM Trackers t
+    LEFT JOIN Habits h ON t.IdTracker = h.IdTracker 
+        AND h.HabitDate = CAST(GETDATE() AS DATE)
+    WHERE t.IdUser = @UserId AND t.IsActive = 1;
+    
+    -- Активные цели
+    SELECT * FROM vw_ActiveGoals WHERE IdUser = @UserId;
+    
+    -- Задачи на сегодня
+    SELECT 
+        t.IdTask,
+        t.Text,
+        t.Status,
+        t.Deadline,
+        l.Title AS ListTitle
+    FROM Tasks t
+    INNER JOIN TodoLists l ON t.IdTodoList = l.IdTodoList
+    WHERE l.IdUser = @UserId 
+      AND t.Status IN ('Created', 'InProgress')
+      AND (t.Deadline IS NULL OR CAST(t.Deadline AS DATE) <= CAST(GETDATE() AS DATE));
+    
+    -- Последние заметки
+    SELECT TOP 5
+        IdNote,
+        Title,
+        NoteDate,
+        Mood
+    FROM Notes
+    WHERE IdUser = @UserId
+    ORDER BY NoteDate DESC, CreatedTime DESC;
+    
+    -- Статистика за сегодня
+    SELECT 
+        ISNULL(SUM(CASE WHEN h.Status IN ('Good', 'Done') THEN 1 ELSE 0 END), 0) AS HabitsDone,
+        ISNULL(SUM(CASE WHEN t.Status = 'Completed' THEN 1 ELSE 0 END), 0) AS TasksDone,
+        s.StreakDays
+    FROM Users u
+    LEFT JOIN UserStats s ON u.IdUser = s.IdUser AND s.StatDate = CAST(GETDATE() AS DATE)
+    LEFT JOIN Habits h ON u.IdUser IN (SELECT IdUser FROM Trackers WHERE IdTracker = h.IdTracker)
+        AND h.HabitDate = CAST(GETDATE() AS DATE)
+    LEFT JOIN Tasks t ON u.IdUser IN (SELECT IdUser FROM TodoLists WHERE IdTodoList = t.IdTodoList)
+        AND CAST(t.CompletedAt AS DATE) = CAST(GETDATE() AS DATE)
+    WHERE u.IdUser = @UserId;
+END;
+GO
+
+-- Процедура для добавления заметки с фото
+CREATE PROCEDURE sp_AddNoteWithPhotos
+    @UserId INT,
+    @Title NVARCHAR(500) = NULL,
+    @Text NVARCHAR(MAX) = NULL,
+    @Mood TINYINT = NULL,
+    @PhotoResources NVARCHAR(MAX) = NULL, -- JSON с фото
+    @TemplateId INT = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    DECLARE @NoteId INT;
+    DECLARE @PhotoTable TABLE (Resource NVARCHAR(500), [Order] INT);
+    
+    BEGIN TRY
+        BEGIN TRANSACTION;
+        
+        -- Вставка заметки
+        INSERT INTO Notes (IdUser, NoteDate, CreatedTime, Title, Text, Mood)
+        VALUES (@UserId, GETDATE(), CAST(GETDATE() AS TIME), @Title, @Text, @Mood);
+        
+        SET @NoteId = SCOPE_IDENTITY();
+        
+        -- Вставка фото (если есть)
+        IF @PhotoResources IS NOT NULL
+        BEGIN
+            INSERT INTO @PhotoTable (Resource, [Order])
+            SELECT 
+                JSON_VALUE(value, '$.resource'),
+                JSON_VALUE(value, '$.order')
+            FROM OPENJSON(@PhotoResources);
+            
+            INSERT INTO Photos (IdNote, Resource, Caption, DisplayOrder)
+            SELECT @NoteId, Resource, NULL, [Order]
+            FROM @PhotoTable;
+        END;
+        
+        -- Связь с шаблоном (если есть)
+        IF @TemplateId IS NOT NULL
+        BEGIN
+            INSERT INTO TemplatesForNotes (IdTemplate, IdNote)
+            VALUES (@TemplateId, @NoteId);
+            
+            UPDATE Templates SET UsageCount = UsageCount + 1
+            WHERE IdTemplate = @TemplateId;
+        END;
+        
+        COMMIT TRANSACTION;
+        
+        SELECT @NoteId AS NoteId, 'Success' AS Status;
+    END TRY
+    BEGIN CATCH
+        ROLLBACK TRANSACTION;
+        SELECT 0 AS NoteId, ERROR_MESSAGE() AS Error;
+    END CATCH
+END;
+GO

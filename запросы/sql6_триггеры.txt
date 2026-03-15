@@ -1,0 +1,74 @@
+-- Триггер для обновления счетчиков статей
+CREATE TRIGGER trg_Articles_UpdateCounts
+ON Likes
+AFTER INSERT, DELETE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    UPDATE Articles
+    SET CountLikes = (
+        SELECT COUNT(*) 
+        FROM Likes l 
+        WHERE l.IdArticle = Articles.IdArticle
+    )
+    WHERE IdArticle IN (SELECT IdArticle FROM inserted)
+       OR IdArticle IN (SELECT IdArticle FROM deleted);
+END;
+GO
+
+-- Триггер для автоматического обновления прогресса цели
+CREATE TRIGGER trg_Goals_UpdateProgress
+ON Tasks
+AFTER UPDATE, INSERT, DELETE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    UPDATE Goals
+    SET Progress = (
+        SELECT 
+            CASE 
+                WHEN COUNT(*) > 0 
+                THEN (COUNT(CASE WHEN t.Status = 'Completed' THEN 1 END) * 100) / COUNT(*)
+                ELSE 0
+            END
+        FROM Tasks t
+        WHERE t.IdGoal = Goals.IdGoal
+    )
+    WHERE IdGoal IN (
+        SELECT DISTINCT IdGoal FROM inserted WHERE IdGoal IS NOT NULL
+        UNION
+        SELECT DISTINCT IdGoal FROM deleted WHERE IdGoal IS NOT NULL
+    );
+END;
+GO
+
+-- Триггер для обновления статистики пользователя
+CREATE TRIGGER trg_UserStats_Update
+ON Habits
+AFTER INSERT, UPDATE, DELETE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    MERGE UserStats AS target
+    USING (
+        SELECT 
+            t.IdUser,
+            CAST(GETDATE() AS DATE) AS StatDate,
+            COUNT(*) AS HabitsCompleted
+        FROM inserted i
+        INNER JOIN Trackers t ON i.IdTracker = t.IdTracker
+        WHERE i.Status IN ('Good', 'Done')
+        GROUP BY t.IdUser
+    ) AS source
+    ON target.IdUser = source.IdUser AND target.StatDate = source.StatDate
+    WHEN MATCHED THEN
+        UPDATE SET HabitsCompleted = target.HabitsCompleted + source.HabitsCompleted,
+                   LastCalculated = GETDATE()
+    WHEN NOT MATCHED THEN
+        INSERT (IdUser, StatDate, HabitsCompleted, LastCalculated)
+        VALUES (source.IdUser, source.StatDate, source.HabitsCompleted, GETDATE());
+END;
+GO

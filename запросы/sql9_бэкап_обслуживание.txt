@@ -1,0 +1,38 @@
+-- Создание задания для обслуживания индексов
+CREATE PROCEDURE sp_Maintenance_DefragIndexes
+AS
+BEGIN
+    DECLARE @TableName NVARCHAR(255);
+    DECLARE @Command NVARCHAR(MAX);
+    
+    DECLARE table_cursor CURSOR FOR
+    SELECT 
+        OBJECT_SCHEMA_NAME(ips.object_id) + '.' + OBJECT_NAME(ips.object_id) AS TableName
+    FROM sys.dm_db_index_physical_stats(DB_ID(), NULL, NULL, NULL, 'LIMITED') ips
+    JOIN sys.indexes i ON ips.object_id = i.object_id AND ips.index_id = i.index_id
+    WHERE ips.avg_fragmentation_in_percent > 30
+    GROUP BY OBJECT_SCHEMA_NAME(ips.object_id) + '.' + OBJECT_NAME(ips.object_id);
+    
+    OPEN table_cursor;
+    FETCH NEXT FROM table_cursor INTO @TableName;
+    
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        SET @Command = 'ALTER INDEX ALL ON ' + @TableName + ' REBUILD;';
+        EXEC sp_executesql @Command;
+        
+        FETCH NEXT FROM table_cursor INTO @TableName;
+    END
+    
+    CLOSE table_cursor;
+    DEALLOCATE table_cursor;
+END;
+GO
+
+-- Процедура обновления статистики
+CREATE PROCEDURE sp_Maintenance_UpdateStatistics
+AS
+BEGIN
+    EXEC sp_updatestats;
+END;
+GO

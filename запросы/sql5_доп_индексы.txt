@@ -1,0 +1,13 @@
+-- Составные индексы для часто выполняемых запросов
+CREATE NONCLUSTERED INDEX IX_Articles_Search ON Articles(Title, PublishedAt) 
+    INCLUDE (Description) WHERE Status = 'Published';
+
+CREATE NONCLUSTERED INDEX IX_Notes_Search ON Notes(NoteDate, Mood) 
+    INCLUDE (Title) WHERE IsPrivate = 0;
+
+CREATE NONCLUSTERED INDEX IX_Habits_Analysis ON Habits(IdTracker, Status, HabitDate) 
+    INCLUDE (Value);
+
+-- Пространственный индекс для иерархии (если нужно)
+-- CREATE SPATIAL INDEX IX_TodoLists_Path ON TodoLists(ListPath);
+GO
