@@ -1,25 +1,23 @@
 CREATE TABLE Users (
     IdUser INT IDENTITY(1,1) NOT NULL,
-    UserName NVARCHAR(200) NOT NULL,
+    Name NVARCHAR(200) NOT NULL,
     Email NVARCHAR(300) NOT NULL,
     Phone NVARCHAR(20) NULL,
-    PasswordHash NVARCHAR(255) NOT NULL,
-    TimeZone NVARCHAR(100) NOT NULL DEFAULT 'UTC',
-    Language NVARCHAR(10) NOT NULL DEFAULT 'ru',
-    Settings NVARCHAR(MAX) NULL, -- JSON с настройками
+    Password NVARCHAR(255) NOT NULL,
     IsAuthor BIT NOT NULL DEFAULT 0,
     Birthday DATE NULL,
+    Language NVARCHAR(10) NOT NULL DEFAULT 'ru',
     LastLoginAt DATETIME NULL,
-    CreatedAt DATETIME NOT NULL DEFAULT GETDATE(),
-    UpdatedAt DATETIME NULL,
+    DateCreated DATETIME NOT NULL DEFAULT GETDATE(),
+    DateUpdated DATETIME NULL,
+    DateDeleted DATETIME NULL,
     IsDeleted BIT NOT NULL DEFAULT 0,
-    DeletedAt DATETIME NULL,
     
     CONSTRAINT PK_Users PRIMARY KEY CLUSTERED (IdUser),
     CONSTRAINT UX_Users_Email UNIQUE NONCLUSTERED (Email) WHERE IsDeleted = 0,
     CONSTRAINT UX_Users_Phone UNIQUE NONCLUSTERED (Phone) WHERE Phone IS NOT NULL AND IsDeleted = 0,
     CONSTRAINT UX_Users_UserName UNIQUE NONCLUSTERED (UserName) WHERE IsDeleted = 0,
-    CONSTRAINT CK_Users_Language CHECK (Language IN ('ru', 'en', 'kk')),
+    CONSTRAINT CK_Users_Language CHECK (Language IN ('ru', 'en')),
     CONSTRAINT CK_Users_Email CHECK (Email LIKE '%_@__%.__%')
 );
 GO
@@ -33,37 +31,28 @@ GO
 CREATE TABLE Themes (
     IdTheme INT IDENTITY(1,1) NOT NULL,
     Title NVARCHAR(200) NOT NULL,
-    Description NVARCHAR(500) NULL,
-    Slug NVARCHAR(200) NOT NULL,
-    ParentThemeId INT NULL,
-    DisplayOrder INT NOT NULL DEFAULT 0,
+    IdParentTheme INT NULL,
     IsActive BIT NOT NULL DEFAULT 1,
-    CreatedAt DATETIME NOT NULL DEFAULT GETDATE(),
     
     CONSTRAINT PK_Themes PRIMARY KEY CLUSTERED (IdTheme),
-    CONSTRAINT UX_Themes_Slug UNIQUE NONCLUSTERED (Slug),
-    CONSTRAINT FK_Themes_Parent FOREIGN KEY (ParentThemeId) REFERENCES Themes(IdTheme)
+    CONSTRAINT FK_Themes_Parent FOREIGN KEY (IdParentTheme) REFERENCES Themes(IdTheme)
 );
 GO
 
 
 CREATE TABLE Articles (
     IdArticle INT IDENTITY(1,1) NOT NULL,
-    IdAuthor INT NOT NULL,
     Title NVARCHAR(200) NOT NULL,
-    Slug NVARCHAR(300) NOT NULL,
     Description NVARCHAR(MAX) NULL,
-    Content NVARCHAR(MAX) NOT NULL,
+    PublicationDate DATETIME NULL,
+    UpdateDate DATETIME NULL,
     Status NVARCHAR(50) NOT NULL,
-    Version INT NOT NULL DEFAULT 1,
-    PublishedAt DATETIME NULL,
-    CreatedAt DATETIME NOT NULL DEFAULT GETDATE(),
-    UpdatedAt DATETIME NULL,
-    Views INT NOT NULL DEFAULT 0,
-    RowVersion ROWVERSION,
+    Text NVARCHAR(MAX) NOT NULL,
+    Author INT NOT NULL,
+    CountLikes INT NOT NULL,
+    CountFavs INT NOT NULL,
     
     CONSTRAINT PK_Articles PRIMARY KEY CLUSTERED (IdArticle),
-    CONSTRAINT UX_Articles_Slug UNIQUE NONCLUSTERED (Slug),
     CONSTRAINT FK_Articles_Author FOREIGN KEY (IdAuthor) REFERENCES Users(IdUser),
     CONSTRAINT CK_Articles_Status CHECK (Status IN ('Draft', 'Published', 'Archived', 'Blocked'))
 );
@@ -71,10 +60,8 @@ GO
 
 -- Индексы для Articles
 CREATE NONCLUSTERED INDEX IX_Articles_Author_Status ON Articles(IdAuthor, Status) 
-    INCLUDE (Title, PublishedAt);
-CREATE NONCLUSTERED INDEX IX_Articles_PublishedAt ON Articles(PublishedAt DESC) 
-    WHERE Status = 'Published';
-CREATE NONCLUSTERED INDEX IX_Articles_Views ON Articles(Views DESC) 
+    INCLUDE (Title, PublicationDate);
+CREATE NONCLUSTERED INDEX IX_Articles_PublicationDate ON Articles(PublicationDate DESC) 
     WHERE Status = 'Published';
 GO
 
@@ -82,7 +69,6 @@ GO
 CREATE TABLE ThemesForArticles (
     IdArticle INT NOT NULL,
     IdTheme INT NOT NULL,
-    CreatedAt DATETIME NOT NULL DEFAULT GETDATE(),
     
     CONSTRAINT PK_ThemesForArticles PRIMARY KEY (IdArticle, IdTheme),
     CONSTRAINT FK_ThemesForArticles_Article FOREIGN KEY (IdArticle) 
@@ -96,7 +82,7 @@ GO
 CREATE TABLE Likes (
     IdArticle INT NOT NULL,
     IdUser INT NOT NULL,
-    CreatedAt DATETIME NOT NULL DEFAULT GETDATE(),
+    Date DATETIME NOT NULL DEFAULT GETDATE(),
     
     CONSTRAINT PK_Likes PRIMARY KEY (IdArticle, IdUser),
     CONSTRAINT FK_Likes_Article FOREIGN KEY (IdArticle) 
@@ -110,7 +96,7 @@ GO
 CREATE TABLE Favorites (
     IdArticle INT NOT NULL,
     IdUser INT NOT NULL,
-    CreatedAt DATETIME NOT NULL DEFAULT GETDATE(),
+    Date DATETIME NOT NULL DEFAULT GETDATE(),
     
     CONSTRAINT PK_Favorites PRIMARY KEY (IdArticle, IdUser),
     CONSTRAINT FK_Favorites_Article FOREIGN KEY (IdArticle) 
@@ -121,33 +107,13 @@ CREATE TABLE Favorites (
 GO
 
 
-CREATE TABLE ArticleVersions (
-    IdVersion INT IDENTITY(1,1) NOT NULL,
-    IdArticle INT NOT NULL,
-    VersionNumber INT NOT NULL,
-    Title NVARCHAR(200) NOT NULL,
-    Content NVARCHAR(MAX) NOT NULL,
-    SavedAt DATETIME NOT NULL DEFAULT GETDATE(),
-    SavedBy INT NOT NULL,
-    ChangeDescription NVARCHAR(500) NULL,
-    
-    CONSTRAINT PK_ArticleVersions PRIMARY KEY (IdArticle, VersionNumber),
-    CONSTRAINT UX_ArticleVersions_Id UNIQUE NONCLUSTERED (IdVersion),
-    CONSTRAINT FK_ArticleVersions_Article FOREIGN KEY (IdArticle) 
-        REFERENCES Articles(IdArticle) ON DELETE CASCADE,
-    CONSTRAINT FK_ArticleVersions_User FOREIGN KEY (SavedBy) REFERENCES Users(IdUser)
-);
-GO
-
-
 CREATE TABLE Icons (
     IdIcon INT IDENTITY(1,1) NOT NULL,
     Name NVARCHAR(100) NOT NULL,
     Resource NVARCHAR(500) NOT NULL,
     Color NVARCHAR(50) NULL,
     Category NVARCHAR(50) NULL,
-    IsSystem BIT NOT NULL DEFAULT 0,
-    CreatedAt DATETIME NOT NULL DEFAULT GETDATE(),
+    Type NVARCHAR(50) NULL,
     
     CONSTRAINT PK_Icons PRIMARY KEY CLUSTERED (IdIcon),
     CONSTRAINT UX_Icons_Name UNIQUE NONCLUSTERED (Name)
@@ -160,31 +126,25 @@ CREATE TABLE Trackers (
     IdUser INT NOT NULL,
     Title NVARCHAR(200) NOT NULL,
     Description NVARCHAR(MAX) NULL,
+    DateCreated DATETIME NOT NULL DEFAULT GETDATE(),
+    DateUpdated DATETIME NULL,
     Color NVARCHAR(50) NULL,
-    TrackerType NVARCHAR(50) NOT NULL DEFAULT 'habit',
-    GoalValue INT NULL, -- Целевое значение (например, 8 стаканов воды)
-    GoalUnit NVARCHAR(50) NULL, -- Единица измерения (шт, мл, мин)
     IsActive BIT NOT NULL DEFAULT 1,
-    CreatedAt DATETIME NOT NULL DEFAULT GETDATE(),
-    UpdatedAt DATETIME NULL,
     
     CONSTRAINT PK_Trackers PRIMARY KEY CLUSTERED (IdTracker),
     CONSTRAINT FK_Trackers_User FOREIGN KEY (IdUser) REFERENCES Users(IdUser) ON DELETE CASCADE,
-    CONSTRAINT CK_Tracker_Type CHECK (TrackerType IN ('habit', 'mood', 'water', 'sport', 'custom'))
 );
 GO
 
 -- Индексы для Trackers
 CREATE NONCLUSTERED INDEX IX_Trackers_User_Active ON Trackers(IdUser, IsActive) 
-    INCLUDE (Title, TrackerType);
+    INCLUDE (Title);
 GO
 
 
 CREATE TABLE IconsForTracker (
     IdTracker INT NOT NULL,
     IdIcon INT NOT NULL,
-    DisplayOrder INT NOT NULL DEFAULT 0,
-    CreatedAt DATETIME NOT NULL DEFAULT GETDATE(),
     
     CONSTRAINT PK_IconsForTracker PRIMARY KEY (IdTracker, IdIcon),
     CONSTRAINT FK_IconsForTracker_Tracker FOREIGN KEY (IdTracker) 
@@ -197,12 +157,8 @@ GO
 
 CREATE TABLE Habits (
     IdTracker INT NOT NULL,
-    HabitDate DATE NOT NULL,
-    Value DECIMAL(10,2) NULL, -- Числовое значение (для количественных трекеров)
+    DateHabit DATETIME NOT NULL,
     Status NVARCHAR(50) NOT NULL,
-    Comment NVARCHAR(500) NULL,
-    CreatedAt DATETIME NOT NULL DEFAULT GETDATE(),
-    UpdatedAt DATETIME NULL,
     
     CONSTRAINT PK_Habits PRIMARY KEY CLUSTERED (IdTracker, HabitDate),
     CONSTRAINT FK_Habits_Tracker FOREIGN KEY (IdTracker) 
@@ -224,42 +180,20 @@ CREATE TABLE Goals (
     IdUser INT NOT NULL,
     Title NVARCHAR(200) NOT NULL,
     Description NVARCHAR(MAX) NULL,
-    GoalType NVARCHAR(50) NOT NULL DEFAULT 'once',
-    Priority TINYINT NOT NULL DEFAULT 5,
     Deadline DATETIME NULL,
-    StartDate DATE NOT NULL DEFAULT CAST(GETDATE() AS DATE),
     Status NVARCHAR(50) NOT NULL,
-    Progress INT NOT NULL DEFAULT 0,
     IsActive BIT NOT NULL DEFAULT 1,
-    CreatedAt DATETIME NOT NULL DEFAULT GETDATE(),
-    CompletedAt DATETIME NULL,
+    DateCreated DATETIME NOT NULL DEFAULT GETDATE(),
+    DateCompleted DATETIME NULL,
     
     -- Поля для периодичности
     PeriodicityValue INT NULL,
-    PeriodicityUnit NVARCHAR(20) NULL,
-    WeeklyDaysMask TINYINT NULL, -- Битовая маска: 1=пн,2=вт,4=ср,8=чт,16=пт,32=сб,64=вс
-    MonthlyDay TINYINT NULL CHECK (MonthlyDay BETWEEN 1 AND 31),
-    ExecuteTime TIME NULL,
+    PeriodicityUnit NVARCHAR(20) NULL
     
-    -- Вычисляемые поля
-    DaysUntilDeadline AS 
-        CASE 
-            WHEN Deadline IS NOT NULL AND Status NOT IN ('Completed', 'Failed')
-            THEN DATEDIFF(DAY, GETDATE(), Deadline)
-            ELSE NULL
-        END,
-    IsOverdue AS 
-        CASE 
-            WHEN Deadline < GETDATE() AND Status NOT IN ('Completed', 'Failed')
-            THEN CAST(1 AS BIT)
-            ELSE CAST(0 AS BIT)
-        END PERSISTED,
     
     CONSTRAINT PK_Goals PRIMARY KEY NONCLUSTERED (IdGoal),
-    CONSTRAINT UX_Goals_User_Priority UNIQUE CLUSTERED (IdUser, Priority DESC, CreatedAt),
     CONSTRAINT FK_Goals_User FOREIGN KEY (IdUser) REFERENCES Users(IdUser) ON DELETE CASCADE,
     CONSTRAINT CK_Goals_Status CHECK (Status IN ('Created', 'InProgress', 'Completed', 'Failed', 'Frozen')),
-    CONSTRAINT CK_Goals_Type CHECK (GoalType IN ('once', 'daily', 'weekly', 'monthly', 'yearly', 'custom')),
     CONSTRAINT CK_Goals_Periodicity CHECK (
         (PeriodicityUnit IS NULL AND PeriodicityValue IS NULL) OR
         (PeriodicityUnit IN ('minutes', 'hours', 'days', 'weeks') AND PeriodicityValue > 0)
@@ -271,27 +205,20 @@ GO
 CREATE NONCLUSTERED INDEX IX_Goals_Status_Deadline ON Goals(Status, Deadline) 
     WHERE Status IN ('Created', 'InProgress');
 CREATE NONCLUSTERED INDEX IX_Goals_User_Active ON Goals(IdUser, IsActive) 
-    INCLUDE (Title, Progress);
+    INCLUDE (Title, Status);
 GO
 
 
 CREATE TABLE TodoLists (
     IdTodoList INT IDENTITY(1,1) NOT NULL,
     IdUser INT NOT NULL,
-    IdGoal INT NULL,
-    ParentListId INT NULL,
+    IdNote INT NULL,
+    IdParentTodoList INT NULL,
     Title NVARCHAR(200) NOT NULL,
-    ListPath HIERARCHYID NOT NULL,
-    ListDate DATE NULL,
-    IsCompleted BIT NOT NULL DEFAULT 0,
-    Position INT NOT NULL DEFAULT 0,
-    CreatedAt DATETIME NOT NULL DEFAULT GETDATE(),
-    CompletedAt DATETIME NULL,
     
     CONSTRAINT PK_TodoLists PRIMARY KEY NONCLUSTERED (IdTodoList),
-    CONSTRAINT UX_TodoLists_User_Path UNIQUE CLUSTERED (IdUser, ListPath),
+    CONSTRAINT UX_TodoLists_User_Path UNIQUE CLUSTERED (IdUser),
     CONSTRAINT FK_TodoLists_User FOREIGN KEY (IdUser) REFERENCES Users(IdUser) ON DELETE CASCADE,
-    CONSTRAINT FK_TodoLists_Goal FOREIGN KEY (IdGoal) REFERENCES Goals(IdGoal) ON DELETE SET NULL,
     CONSTRAINT FK_TodoLists_Parent FOREIGN KEY (ParentListId) REFERENCES TodoLists(IdTodoList),
     CONSTRAINT UX_TodoLists_User_Title_Parent UNIQUE (IdUser, Title, ParentListId)
 );
@@ -307,13 +234,8 @@ CREATE TABLE Tasks (
     IdTask INT IDENTITY(1,1) NOT NULL,
     IdTodoList INT NOT NULL,
     IdGoal INT NULL,
-    Position INT NOT NULL DEFAULT 0,
     Text NVARCHAR(MAX) NOT NULL,
     Status NVARCHAR(50) NOT NULL,
-    Deadline DATETIME NULL,
-    CompletedAt DATETIME NULL,
-    CreatedAt DATETIME NOT NULL DEFAULT GETDATE(),
-    UpdatedAt DATETIME NULL,
     
     CONSTRAINT PK_Tasks PRIMARY KEY NONCLUSTERED (IdTask),
     CONSTRAINT UX_Tasks_List_Position UNIQUE CLUSTERED (IdTodoList, Position),
@@ -333,26 +255,16 @@ CREATE NONCLUSTERED INDEX IX_Tasks_Deadline ON Tasks(Deadline)
 GO
 
 
-CREATE TABLE Reminders (
-    IdReminder INT IDENTITY(1,1) NOT NULL,
+CREATE TABLE Notifications (
+    IdNotification INT IDENTITY(1,1) NOT NULL,
     IdUser INT NOT NULL,
-    IdGoal INT NULL,
-    IdTask INT NULL,
-    Title NVARCHAR(200) NOT NULL,
     Text NVARCHAR(500) NOT NULL,
-    ReminderType NVARCHAR(50) NOT NULL,
-    ReminderTime TIME NOT NULL,
+    Time TIME NOT NULL,
     PeriodicityValue INT NULL,
     PeriodicityUnit NVARCHAR(20) NULL,
-    NextReminderDate DATETIME NULL,
-    IsActive BIT NOT NULL DEFAULT 1,
-    CreatedAt DATETIME NOT NULL DEFAULT GETDATE(),
     
-    CONSTRAINT PK_Reminders PRIMARY KEY CLUSTERED (IdReminder),
+    CONSTRAINT PK_Reminders PRIMARY KEY CLUSTERED (IdNotification),
     CONSTRAINT FK_Reminders_User FOREIGN KEY (IdUser) REFERENCES Users(IdUser) ON DELETE CASCADE,
-    CONSTRAINT FK_Reminders_Goal FOREIGN KEY (IdGoal) REFERENCES Goals(IdGoal) ON DELETE CASCADE,
-    CONSTRAINT FK_Reminders_Task FOREIGN KEY (IdTask) REFERENCES Tasks(IdTask) ON DELETE CASCADE,
-    CONSTRAINT CK_Reminders_Type CHECK (ReminderType IN ('once', 'daily', 'weekly', 'monthly', 'yearly')),
     CONSTRAINT CK_Reminders_Reference CHECK (
         (IdGoal IS NOT NULL AND IdTask IS NULL) OR
         (IdGoal IS NULL AND IdTask IS NOT NULL) OR
@@ -361,31 +273,22 @@ CREATE TABLE Reminders (
 );
 GO
 
--- Индексы для Reminders
-CREATE NONCLUSTERED INDEX IX_Reminders_NextDate ON Reminders(NextReminderDate, IsActive) 
+-- Индексы для Notifications
+CREATE NONCLUSTERED INDEX IX_Notifications_NextDate ON Notifications(NextReminderDate, IsActive) 
     INCLUDE (IdUser, Title, Text);
-CREATE NONCLUSTERED INDEX IX_Reminders_User ON Reminders(IdUser, IsActive);
+CREATE NONCLUSTERED INDEX IX_Notifications_User ON Notifications(IdUser, IsActive);
 GO
 
 
 CREATE TABLE Notes (
     IdNote INT IDENTITY(1,1) NOT NULL,
     IdUser INT NOT NULL,
-    IdTodoList INT NULL,
-    NoteDate DATE NOT NULL DEFAULT CAST(GETDATE() AS DATE),
-    CreatedTime TIME NOT NULL DEFAULT CAST(GETDATE() AS TIME),
-    Title NVARCHAR(500) NULL,
+    Date DATE NOT NULL DEFAULT CAST(GETDATE() AS DATE),
     Text NVARCHAR(MAX) NULL,
-    Mood TINYINT NULL,
-    IsPrivate BIT NOT NULL DEFAULT 0,
-    CreatedAt DATETIME NOT NULL DEFAULT GETDATE(),
-    UpdatedAt DATETIME NULL,
+   
     
     CONSTRAINT PK_Notes PRIMARY KEY CLUSTERED (IdNote),
     CONSTRAINT FK_Notes_User FOREIGN KEY (IdUser) REFERENCES Users(IdUser) ON DELETE CASCADE,
-    CONSTRAINT FK_Notes_TodoList FOREIGN KEY (IdTodoList) REFERENCES TodoLists(IdTodoList),
-    CONSTRAINT CK_Notes_Mood CHECK (Mood BETWEEN 1 AND 10),
-    CONSTRAINT UX_Notes_User_Date_Time UNIQUE (IdUser, NoteDate, CreatedTime)
 );
 GO
 
@@ -400,11 +303,7 @@ CREATE TABLE Photos (
     IdPhoto INT IDENTITY(1,1) NOT NULL,
     IdNote INT NOT NULL,
     Resource NVARCHAR(500) NOT NULL,
-    Caption NVARCHAR(500) NULL,
-    DisplayOrder INT NOT NULL DEFAULT 0,
-    FileSize INT NULL,
-    MimeType NVARCHAR(100) NULL,
-    UploadedAt DATETIME NOT NULL DEFAULT GETDATE(),
+    
     
     CONSTRAINT PK_Photos PRIMARY KEY CLUSTERED (IdPhoto),
     CONSTRAINT FK_Photos_Note FOREIGN KEY (IdNote) REFERENCES Notes(IdNote) ON DELETE CASCADE
@@ -418,30 +317,16 @@ GO
 
 CREATE TABLE Templates (
     IdTemplate INT IDENTITY(1,1) NOT NULL,
-    IdUser INT NOT NULL,
-    Title NVARCHAR(200) NOT NULL,
     Text NVARCHAR(MAX) NOT NULL,
-    Category NVARCHAR(100) NULL,
-    IsPublic BIT NOT NULL DEFAULT 0,
-    UsageCount INT NOT NULL DEFAULT 0,
-    CreatedAt DATETIME NOT NULL DEFAULT GETDATE(),
-    UpdatedAt DATETIME NULL,
-    
+  
     CONSTRAINT PK_Templates PRIMARY KEY CLUSTERED (IdTemplate),
-    CONSTRAINT FK_Templates_User FOREIGN KEY (IdUser) REFERENCES Users(IdUser) ON DELETE CASCADE
 );
-GO
-
--- Индексы для Templates
-CREATE NONCLUSTERED INDEX IX_Templates_User ON Templates(IdUser, IsPublic);
-CREATE NONCLUSTERED INDEX IX_Templates_Public ON Templates(IsPublic, UsageCount) WHERE IsPublic = 1;
 GO
 
 
 CREATE TABLE TemplatesForNotes (
     IdTemplate INT NOT NULL,
     IdNote INT NOT NULL,
-    CreatedAt DATETIME NOT NULL DEFAULT GETDATE(),
     
     CONSTRAINT PK_TemplatesForNotes PRIMARY KEY (IdTemplate, IdNote),
     CONSTRAINT FK_TemplatesForNotes_Template FOREIGN KEY (IdTemplate) 
