@@ -1,0 +1,14 @@
+CREATE TABLE Photos (
+    IdPhoto INT IDENTITY(1,1) NOT NULL,
+    IdNote INT NOT NULL,
+    Resource NVARCHAR(500) NOT NULL,
+    
+    
+    CONSTRAINT PK_Photos PRIMARY KEY CLUSTERED (IdPhoto),
+    CONSTRAINT FK_Photos_Note FOREIGN KEY (IdNote) REFERENCES Notes(IdNote) ON DELETE CASCADE
+);
+GO
+
+-- Индекс для Photos
+CREATE NONCLUSTERED INDEX IX_Photos_Note ON Photos(IdNote);
+GO

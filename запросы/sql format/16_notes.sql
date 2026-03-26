@@ -1,0 +1,17 @@
+CREATE TABLE Notes (
+    IdNote INT IDENTITY(1,1) NOT NULL,
+    IdUser INT NOT NULL,
+    Date DATE NOT NULL DEFAULT CAST(GETDATE() AS DATE),
+    Text NVARCHAR(MAX) NULL,
+   
+    
+    CONSTRAINT PK_Notes PRIMARY KEY CLUSTERED (IdNote),
+    CONSTRAINT FK_Notes_User FOREIGN KEY (IdUser) REFERENCES Users(IdUser) ON DELETE CASCADE,
+);
+GO
+
+-- Индексы для Notes
+CREATE NONCLUSTERED INDEX IX_Notes_User_Date ON Notes(IdUser, Date) 
+    INCLUDE (Text);
+CREATE NONCLUSTERED INDEX IX_Notes_Date ON Notes(Date);
+GO
