@@ -3,6 +3,7 @@ CREATE TABLE Notes (
     IdUser INT NOT NULL,
     Date DATE NOT NULL DEFAULT CAST(GETDATE() AS DATE),
     Text NVARCHAR(MAX) NULL,
+	IdThemeForNote INT REFERENCES ThemesForNotes(IdThemeForNote),
    
     
     CONSTRAINT PK_Notes PRIMARY KEY CLUSTERED (IdNote),

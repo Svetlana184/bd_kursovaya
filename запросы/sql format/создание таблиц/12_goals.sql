@@ -5,13 +5,12 @@ CREATE TABLE Goals (
     Description NVARCHAR(MAX) NULL,
     Deadline DATETIME NULL,
     Status NVARCHAR(50) NOT NULL,
-    IsActive BIT NOT NULL DEFAULT 1,
     DateCreated DATETIME NOT NULL DEFAULT GETDATE(),
     DateCompleted DATETIME NULL,
     
     -- Поля для периодичности
     PeriodicityValue INT NULL,
-    PeriodicityUnit NVARCHAR(20) NULL
+    PeriodicityUnit NVARCHAR(100) NULL
     
     
     CONSTRAINT PK_Goals PRIMARY KEY NONCLUSTERED (IdGoal),
@@ -27,6 +26,6 @@ GO
 -- Индексы для Goals
 CREATE NONCLUSTERED INDEX IX_Goals_Status_Deadline ON Goals(Status, Deadline) 
     WHERE Status IN ('Created', 'InProgress');
-CREATE NONCLUSTERED INDEX IX_Goals_User_Active ON Goals(IdUser, IsActive) 
+CREATE NONCLUSTERED INDEX IX_Goals_User_Active ON Goals(IdUser) 
     INCLUDE (Title, Status);
 GO

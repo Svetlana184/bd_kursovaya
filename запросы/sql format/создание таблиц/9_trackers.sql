@@ -7,6 +7,8 @@ CREATE TABLE Trackers (
     DateUpdated DATETIME NULL,
     Color NVARCHAR(50) NULL,
     IsActive BIT NOT NULL DEFAULT 1,
+	UnitsOfMeasurement NVARCHAR(50) NOT NULL,
+	ReferenceValue DECIMAL(10, 2) NOT NULL,
     
     CONSTRAINT PK_Trackers PRIMARY KEY CLUSTERED (IdTracker),
     CONSTRAINT FK_Trackers_User FOREIGN KEY (IdUser) REFERENCES Users(IdUser) ON DELETE CASCADE,

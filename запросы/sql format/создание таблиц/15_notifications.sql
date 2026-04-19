@@ -7,6 +7,7 @@ CREATE TABLE Notifications (
     PeriodicityUnit NVARCHAR(20) NULL,
 	IdGoal INT NULL,
 	IdTask INT NULL,
+	Type NVARCHAR(100),
     
     CONSTRAINT PK_Reminders PRIMARY KEY CLUSTERED (IdNotification),
     CONSTRAINT FK_Reminders_User FOREIGN KEY (IdUser) REFERENCES Users(IdUser) ON DELETE CASCADE,

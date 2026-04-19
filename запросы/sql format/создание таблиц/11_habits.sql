@@ -3,6 +3,7 @@ CREATE TABLE Habits (
     DateHabit DATE NOT NULL,
 	TimeHabit TIME NOT NULL,
     Status NVARCHAR(50) NOT NULL,
+	Value DECIMAL(10, 2) NOT NULL,
     
     CONSTRAINT PK_Habits PRIMARY KEY CLUSTERED (IdTracker, DateHabit, TimeHabit),
     CONSTRAINT FK_Habits_Tracker FOREIGN KEY (IdTracker) 

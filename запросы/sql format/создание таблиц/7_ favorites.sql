@@ -1,4 +1,4 @@
-CREATE TABLE Favorites (
+CREATE TABLE Favs (
     IdArticle INT NOT NULL,
     IdUser INT NOT NULL,
     Date DATETIME NOT NULL DEFAULT GETDATE(),

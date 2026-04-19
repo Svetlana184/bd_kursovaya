@@ -1,4 +1,4 @@
-/*
+
 CREATE TABLE Articles (
     IdArticle INT IDENTITY(1,1) NOT NULL,
     Title NVARCHAR(200) NOT NULL,
@@ -8,8 +8,9 @@ CREATE TABLE Articles (
     Status NVARCHAR(50) NOT NULL,
     Text NVARCHAR(MAX) NOT NULL,
     Author INT NOT NULL,
-    CountLikes INT NOT NULL,
-    CountFavs INT NOT NULL,
+    CountLikes INT DEFAULT 0 NOT NULL,
+    CountFavs INT DEFAULT 0 NOT NULL,
+	CountViews INT DEFAULT 0 NOT NULL,
     
     CONSTRAINT PK_Articles PRIMARY KEY CLUSTERED (IdArticle),
     CONSTRAINT FK_Articles_Author FOREIGN KEY (Author) REFERENCES Users(IdUser),
@@ -23,7 +24,7 @@ CREATE NONCLUSTERED INDEX IX_Articles_Author_Status ON Articles(Author, Status)
 CREATE NONCLUSTERED INDEX IX_Articles_PublicationDate ON Articles(PublicationDate DESC) 
     WHERE Status = 'Published';
 GO
-*/
+
 CREATE NONCLUSTERED INDEX IX_Articles_Title ON Articles(Title) 
      INCLUDE (IdArticle, Author, PublicationDate, Text);
 GO
