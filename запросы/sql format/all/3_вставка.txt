@@ -1,0 +1,198 @@
+
+INSERT INTO Users (Name, Email, Phone, PasswordHash, IsAuthor, Birthday, Language, LastLoginAt, DateCreated, IsDeleted, UserName)
+VALUES
+('Анна Петрова', 'anna@example.com', '+79001234567', 'hash_anna123', 1, '1990-05-15', 'ru', GETDATE(), GETDATE(), 0, 'неуклюжий_морж'),
+('Иван Сидоров', 'ivan@example.com', '+79007654321', 'hash_ivan456', 0, '1985-12-20', 'ru', GETDATE(), GETDATE(), 0, 'квакающая_щука'),
+('Мария Иванова', 'maria@example.com', NULL, 'hash_maria789', 1, '1995-03-10', 'en', GETDATE(), GETDATE(), 0, 'мозговая_пиявка'),
+('Ольга Смирнова', 'olga@example.com', '+79009998877', 'hash_olga999', 0, '2000-07-22', 'ru', NULL, GETDATE(), 0, 'ненасытный_таракан'),
+('Алексей Козлов', 'alex@example.com', '+79001112233', 'hash_alex111', 1, '1988-11-30', 'en', GETDATE(), GETDATE(), 0, '🦄🦄🦄');
+GO
+
+
+
+INSERT INTO Articles (Title, Description, PublicationDate, UpdateDate, Status, Text, Author, CountLikes, CountFavs, CountViews)
+VALUES
+('Как начать медитировать', 'Простые шаги для начинающих', GETDATE(), NULL, 'Published', 'Текст статьи о медитации...', 2, 0, 0, 120),
+('Польза утренней зарядки', 'Зарядка и продуктивность', GETDATE(), NULL, 'Published', 'Текст о зарядке...', 3, 0, 0, 95),
+('Тайм-менеджмент для занятых', 'Как всё успевать', GETDATE(), NULL, 'Draft', 'Текст о тайм-менеджменте...', 5, 0, 0, 0),
+('Как справиться со стрессом', 'Советы психолога', GETDATE(), NULL, 'Published', 'Текст о стрессе...', 2, 0, 0, 210),
+('Правильное питание', 'Основы здорового рациона', GETDATE(), GETDATE(), 'Archived', 'Текст о питании...', 3, 0, 0, 45),
+('10 минут йоги в день', 'Простая практика для здоровья', GETDATE(), NULL, 'Published', 'Текст о йоге...', 5, 0, 0, 78),
+('Как высыпаться', 'Советы по улучшению сна', GETDATE(), NULL, 'Published', 'Текст о сне...', 2, 0, 0, 156);
+GO
+
+
+
+INSERT INTO ThemesForArticles (Title, IdParentTheme, IsActive)
+VALUES
+('Здоровье', NULL, 1),
+('Психология', NULL, 1),
+('Продуктивность', NULL, 1),
+('Спорт', NULL, 1),
+('Медитация', NULL, 1),
+('Питание', NULL, 1),
+('Сон', NULL, 1);
+GO
+
+
+INSERT INTO TagArticles (IdArticle, IdThemeForArticles)
+VALUES
+(3, 26), (3, 23),   -- Медитация → Психология, Медитация
+(4, 22), (4, 25),   -- Зарядка → Здоровье, Спорт
+(5, 24),           -- Тайм-менеджмент → Продуктивность
+(4, 23),           -- Стресс → Психология
+(6, 27), (6, 22),   -- Питание → Здоровье, Питание
+(8, 22), (8, 25),   -- Йога → Здоровье, Спорт
+(9, 22), (9, 28);   -- Сон → Здоровье, Сон
+GO
+
+INSERT INTO Likes (IdArticle, IdUser, Date)
+VALUES
+(3, 2, GETDATE()), (3, 4, GETDATE()), (4, 4, GETDATE()), (4, 2, GETDATE()), (4, 5, GETDATE()), (7, 3, GETDATE()), (7, 4, GETDATE());
+
+INSERT INTO Favs (IdArticle, IdUser, Date)
+VALUES
+(3, 5, GETDATE()), (4, 3, GETDATE()), (4, 5, GETDATE()), (7, 2, GETDATE());
+GO
+
+INSERT INTO Icons (Title, Resource, Color, Category, Type)
+VALUES
+('Спорт', '/icons/sport.svg', '#FF5733', 'activity', 'habit'),
+('Вода', '/icons/water.svg', '#33A1FF', 'health', 'habit'),
+('Медитация', '/icons/meditation.svg', '#33FF57', 'mindfulness', 'habit'),
+('Сон', '/icons/sleep.svg', '#A133FF', 'health', 'habit'),
+('Прогулка', '/icons/walk.svg', '#FFA500', 'activity', 'habit'),
+('Книга', '/icons/book.svg', '#FF33A1', 'learning', 'habit'),
+('Зарядка', '/icons/exercise.svg', '#FF5733', 'activity', 'habit');
+GO
+
+INSERT INTO Trackers (IdUser, Title, Description, DateCreated, DateUpdated, Color, IsActive, UnitsOfMeasurement, ReferenceValue)
+VALUES
+(2, 'Пить воду', 'Ежедневное потребление воды', GETDATE(), NULL, '#33A1FF', 1, 'литры', 2.5),
+(2, 'Утренняя зарядка', 'Зарядка по утрам', GETDATE(), NULL, '#FF5733', 1, 'минуты', 15),
+(2, 'Медитация', 'Практика осознанности', GETDATE(), NULL, '#33FF57', 1, 'минуты', 10),
+(3, 'Прогулка', 'Ежедневная прогулка', GETDATE(), NULL, '#FFA500', 1, 'шаги', 8000),
+(4, 'Сон', 'Отслеживание сна', GETDATE(), NULL, '#A133FF', 1, 'часы', 8),
+(5, 'Чтение книг', 'Ежедневное чтение', GETDATE(), NULL, '#FF33A1', 1, 'страницы', 30),
+(2, 'Йога', 'Утренняя практика', GETDATE(), NULL, '#33FF57', 1, 'минуты', 20);
+GO
+
+INSERT INTO IconsForTracker (IdTracker, IdIcon)
+VALUES
+(9, 8), (10, 9), (11, 10), (12, 11), (13, 12), (14, 13), (15, 14);
+GO
+
+INSERT INTO Habits (IdTracker, DateHabit, TimeHabit, Status, Value)
+VALUES
+(9, '2025-03-20', '12:00:00', 'Good', 2.2),
+(9, '2025-03-21', '11:30:00', 'Excellent', 2.7),
+(9, '2025-03-22', '12:15:00', 'Normal', 2.0),
+(10, '2025-03-20', '08:00:00', 'Normal', 12),
+(10, '2025-03-21', '07:45:00', 'Good', 15),
+(10, '2025-03-22', '08:10:00', 'Excellent', 18),
+(11, '2025-03-20', '20:00:00', 'Good', 10),
+(11, '2025-03-21', '19:30:00', 'Excellent', 12),
+(11, '2025-03-22', '20:15:00', 'Normal', 8),
+(12, '2025-03-21', '18:00:00', 'A little', 5000),
+(12, '2025-03-22', '17:45:00', 'Normal', 7500),
+(13, '2025-03-20', '23:00:00', 'Good', 7.5),
+(13, '2025-03-21', '22:30:00', 'Excellent', 8.0),
+(14, '2025-03-21', '21:00:00', 'Good', 25),
+(14, '2025-03-22', '20:30:00', 'Excellent', 35),
+(15, '2025-03-22', '09:00:00', 'Normal', 15);
+GO
+
+INSERT INTO Goals (IdUser, Title, Description, Deadline, Status, DateCreated, PeriodicityValue, PeriodicityUnit)
+VALUES
+(2, 'Выучить английский', 'Уровень B2', '20251231', 'InProgress', GETDATE(), NULL, NULL),
+(2, 'Пить больше воды', 'Ежедневно 2.5 литра', '20251231', 'InProgress', GETDATE(), 1, 'days'),
+(2, 'Пробежать марафон', '42 км', '20250901', 'Created', GETDATE(), NULL, NULL),
+(3, 'Медитировать ежедневно', '10 минут в день', '20251231', 'InProgress', GETDATE(), 1, 'days'),
+(5, 'Написать книгу', 'Завершить рукопись', '20251201', 'Frozen', GETDATE(), NULL, NULL),
+(2, 'Йога каждый день', '20 минут практики', '20251231', 'Created', GETDATE(), 1, 'days'),
+(4, 'Похудеть', 'Сбросить 5 кг', '20250815', 'InProgress', GETDATE(), NULL, NULL);
+
+INSERT INTO ThemesForNotes (CountNotes, Title)
+VALUES
+(0, 'Личный дневник'),
+(0, 'Здоровье'),
+(0, 'Работа'),
+(0, 'Эмоции'),
+(0, 'Планирование');
+GO
+
+INSERT INTO Notes (IdUser, Date, Text, IdThemeForNote)
+VALUES
+(6, '2025-03-20', 'Сегодня хороший день, много успел', 6),
+(6, '2025-03-21', 'Устал, но цели достигнуты', 7),
+(2, '2025-03-20', 'Нужно больше отдыхать', 6),
+(3, '2025-03-19', 'Медитация помогает сосредоточиться', 8),
+(5, '2025-03-21', 'План на неделю составлен', 7),
+(6, '2025-03-22', 'Отличная тренировка сегодня!', 8),
+(4, '2025-03-22', 'Хороший день, продуктивная работа', 9);
+GO
+
+INSERT INTO Templates (Text)
+VALUES
+('Сегодня я благодарен за...'),
+('Что я сделал для своего здоровья: ...'),
+('Мои цели на завтра: ...'),
+('Эмоции дня: ...'),
+('Итоги недели: ...');
+GO
+
+INSERT INTO Photos (IdNote, Resource)
+VALUES
+(2, '/uploads/photo1.jpg'),
+(2, '/uploads/photo2.jpg'),
+(3, '/uploads/photo3.jpg'),
+(4, '/uploads/meditation.jpg'),
+(5, '/uploads/plan.jpg'),
+(6, '/uploads/yoga.jpg'),
+(6, '/uploads/yoga2.jpg'),
+(6, '/uploads/yoga3.jpg');
+GO
+
+INSERT INTO TemplatesForNotes (IdTemplate, IdNote)
+VALUES
+(6, 8),
+(6, 2),
+(7, 5),
+(8, 3),
+(9, 4),
+(10, 7);
+GO
+
+INSERT INTO TodoLists (IdUser, IdNote, IdParentTodoList, Title, Date)
+VALUES
+(6, NULL, NULL, 'Рабочие задачи', GETDATE()),
+(6, NULL, NULL, 'Личные задачи', GETDATE()),
+(2, NULL, NULL, 'Отчёты', GETDATE()),
+(3, NULL, NULL, 'Здоровье', GETDATE()),
+(5, NULL, NULL, 'Покупки', GETDATE()),
+(6, NULL, NULL, 'Спорт', GETDATE());
+GO
+
+INSERT INTO Tasks (IdTodoList, IdGoal, Text, Status)
+VALUES
+(8, 4, 'Посмотреть урок английского', 'InProgress'),
+(8, NULL, 'Подготовить презентацию', 'Created'),
+(9, 5, 'Выпить 2 литра воды', 'Completed'),
+(10, NULL, 'Сделать отчёт за март', 'Created'),
+(11, 7, 'Помедитировать 10 минут', 'InProgress'),
+(9, NULL, 'Купить продукты', 'Created'),
+(12, 8, 'Написать главу 1', 'InProgress'),
+(13, 10, 'Сделать йогу', 'Created'),
+(8, NULL, 'Ответить на письма', 'Completed');
+GO
+
+INSERT INTO Notifications (IdUser, Text, Time, PeriodicityValue, PeriodicityUnit, IdGoal, IdTask, Type)
+VALUES
+(6, 'Выпить стакан воды', '10:00:00', 1, 'hours', 5, NULL, 'habit'),
+(6, 'Урок английского', '19:00:00', 1, 'days', 4, NULL, 'goal'),
+(2, 'Тренировка', '08:00:00', NULL, NULL, NULL, NULL, 'custom'),
+(3, 'Медитация', '21:00:00', 1, 'days', 7, NULL, 'goal'),
+(5, 'Проверить задачи', '09:00:00', 1, 'days', NULL, 5, 'task'),
+(6, 'Йога', '08:30:00', 1, 'days', 6, NULL, 'goal'),
+(4, 'Прогулка', '18:00:00', 1, 'days', NULL, NULL, 'habit');
+GO

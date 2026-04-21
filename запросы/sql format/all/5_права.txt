@@ -1,0 +1,173 @@
+USE master;
+GO
+
+-- Создание логинов для каждой роли
+CREATE LOGIN DBA_Login WITH PASSWORD = 'StrongP@ssw0rd_DBA!', DEFAULT_DATABASE = TeploDB;
+CREATE LOGIN App_Login WITH PASSWORD = 'StrongP@ssw0rd_App!', DEFAULT_DATABASE = TeploDB;
+CREATE LOGIN Report_Login WITH PASSWORD = 'StrongP@ssw0rd_Report!', DEFAULT_DATABASE = TeploDB;
+CREATE LOGIN Backup_Login WITH PASSWORD = 'StrongP@ssw0rd_Backup!', DEFAULT_DATABASE = TeploDB;
+CREATE LOGIN Auditor_Login WITH PASSWORD = 'StrongP@ssw0rd_Audit!', DEFAULT_DATABASE = TeploDB;
+GO
+
+
+USE TeploDB;
+GO
+
+-- Создание роли
+CREATE ROLE DBA_Role;
+
+-- Назначение прав
+GRANT CONTROL ON DATABASE::TeploDB TO DBA_Role;
+GRANT ALTER ON DATABASE::TeploDB TO DBA_Role;
+GRANT BACKUP DATABASE TO DBA_Role;
+GRANT BACKUP LOG TO DBA_Role;
+GRANT CREATE TABLE TO DBA_Role;
+GRANT CREATE VIEW TO DBA_Role;
+GRANT CREATE PROCEDURE TO DBA_Role;
+GRANT CREATE FUNCTION TO DBA_Role;
+GRANT CREATE TRIGGER TO DBA_Role;
+GRANT CREATE TYPE TO DBA_Role;
+GRANT VIEW DATABASE STATE TO DBA_Role;
+GRANT VIEW DEFINITION TO DBA_Role;
+
+-- Права на схему dbo
+GRANT CONTROL ON SCHEMA::dbo TO DBA_Role;
+
+-- Добавление пользователя в роль
+CREATE USER DBA_User FOR LOGIN DBA_Login;
+ALTER ROLE DBA_Role ADD MEMBER DBA_User;
+GO
+
+USE TeploDB;
+GO
+
+-- Создание роли
+CREATE ROLE App_Role;
+
+-- Только выполнение хранимых процедур
+GRANT EXECUTE ON SCHEMA::dbo TO App_Role;
+
+-- Запрет прямого доступа к таблицам
+DENY SELECT, INSERT, UPDATE, DELETE ON SCHEMA::dbo TO App_Role;
+
+-- Создание пользователя приложения
+CREATE USER App_User FOR LOGIN App_Login;
+ALTER ROLE App_Role ADD MEMBER App_User;
+GO
+
+
+-- Создание схемы для безопасности
+CREATE SCHEMA security;
+GO
+
+-- Функция фильтрации (пользователь видит только свои данные)
+CREATE FUNCTION security.fn_UserAccessPredicate(@UserId INT)
+RETURNS TABLE
+WITH SCHEMABINDING
+AS
+RETURN
+SELECT 1 AS AccessResult
+WHERE 
+    -- Администратор видит всё
+    IS_ROLEMEMBER('DBA_Role') = 1 
+    OR
+    -- Приложение видит данные только текущего пользователя
+    @UserId = CAST(SESSION_CONTEXT(N'UserId') AS INT);
+GO
+
+-- Применение политики к таблицам
+CREATE SECURITY POLICY security.UserDataPolicy
+ADD FILTER PREDICATE security.fn_UserAccessPredicate(IdUser) ON dbo.Users,
+ADD FILTER PREDICATE security.fn_UserAccessPredicate(IdUser) ON dbo.Notes,
+ADD FILTER PREDICATE security.fn_UserAccessPredicate(IdUser) ON dbo.Habits,
+ADD FILTER PREDICATE security.fn_UserAccessPredicate(IdUser) ON dbo.Goals,
+ADD FILTER PREDICATE security.fn_UserAccessPredicate(IdUser) ON dbo.Trackers,
+ADD FILTER PREDICATE security.fn_UserAccessPredicate(IdUser) ON dbo.Tasks,
+ADD FILTER PREDICATE security.fn_UserAccessPredicate(IdUser) ON dbo.TodoLists;
+GO
+
+USE TeploDB;
+GO
+
+-- Создание роли
+CREATE ROLE Report_Role;
+
+-- Права на чтение представлений
+GRANT SELECT ON vw_UserDashboard TO Report_Role;
+GRANT SELECT ON vw_PopularArticles TO Report_Role;
+GRANT SELECT ON vw_AuthorFullStats TO Report_Role;
+GRANT SELECT ON vw_AppAnalyticsStats TO Report_Role;
+GRANT SELECT ON vw_UsersMonthlyStats TO Report_Role;
+GRANT SELECT ON vw_HabitsStats TO Report_Role;
+GRANT SELECT ON vw_GoalsStats TO Report_Role;
+GRANT SELECT ON vw_NotesStats TO Report_Role;
+
+-- Запрет на изменение данных
+DENY INSERT, UPDATE, DELETE ON SCHEMA::dbo TO Report_Role;
+
+-- Создание пользователя аналитика
+CREATE USER Report_User FOR LOGIN Report_Login;
+ALTER ROLE Report_Role ADD MEMBER Report_User;
+GO
+
+USE TeploDB;
+GO
+
+-- Создание роли
+CREATE ROLE Backup_Role;
+
+-- Права на резервное копирование
+GRANT BACKUP DATABASE TO Backup_Role;
+GRANT BACKUP LOG TO Backup_Role;
+
+-- Доступ к системным представлениям для мониторинга
+GRANT SELECT ON sys.databases TO Backup_Role;
+GRANT SELECT ON sys.master_files TO Backup_Role;
+GRANT SELECT ON sys.backup_set TO Backup_Role;
+
+-- Запрет на доступ к пользовательским данным
+DENY SELECT ON SCHEMA::dbo TO Backup_Role;
+DENY INSERT, UPDATE, DELETE ON SCHEMA::dbo TO Backup_Role;
+
+-- Создание пользователя для бэкапов
+CREATE USER Backup_User FOR LOGIN Backup_Login;
+ALTER ROLE Backup_Role ADD MEMBER Backup_User;
+GO
+
+USE TeploDB;
+GO
+
+-- Создание схемы аудита (если не существует)
+CREATE SCHEMA audit;
+GO
+
+-- Создание таблицы аудита
+CREATE TABLE audit.UserActionsAudit (
+    IdAudit INT IDENTITY(1,1) PRIMARY KEY,
+    UserId INT,
+    ActionType NVARCHAR(50),
+    TableName NVARCHAR(128),
+    RecordId INT,
+    ActionDate DATETIME DEFAULT GETDATE()
+);
+GO
+
+-- Создание роли аудитора
+CREATE ROLE Auditor_Role;
+
+-- Права на чтение аудита
+GRANT SELECT ON SCHEMA::audit TO Auditor_Role;
+GRANT SELECT ON sys.sql_logins TO Auditor_Role;
+GRANT SELECT ON sys.database_principals TO Auditor_Role;
+GRANT SELECT ON sys.database_permissions TO Auditor_Role;
+GRANT SELECT ON sys.server_principals TO Auditor_Role;
+GRANT SELECT ON sys.sql_expression_dependencies TO Auditor_Role;
+
+-- Запрет на изменение
+DENY INSERT, UPDATE, DELETE ON SCHEMA::audit TO Auditor_Role;
+DENY INSERT, UPDATE, DELETE ON SCHEMA::dbo TO Auditor_Role;
+
+-- Создание пользователя аудитора
+CREATE USER Auditor_User FOR LOGIN Auditor_Login;
+ALTER ROLE Auditor_Role ADD MEMBER Auditor_User;
+GO

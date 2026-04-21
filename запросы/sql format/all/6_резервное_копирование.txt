@@ -1,0 +1,213 @@
+-- Включение xp_cmdshell
+EXEC sp_configure 'show advanced options', 1;
+RECONFIGURE;
+GO
+
+EXEC sp_configure 'xp_cmdshell', 1;
+RECONFIGURE;
+GO
+
+-- Проверка, что xp_cmdshell включён
+EXEC sp_configure 'xp_cmdshell';
+GO
+
+-- Создание директорий для хранения бэкапов (выполнить через xp_cmdshell или создать вручную)
+EXEC xp_cmdshell 'mkdir D:\Backups\TeploDB\Full';
+EXEC xp_cmdshell 'mkdir D:\Backups\TeploDB\Diff';
+EXEC xp_cmdshell 'mkdir D:\Backups\TeploDB\Logs';
+EXEC xp_cmdshell 'mkdir D:\Backups\TeploDB\Archive';
+GO
+
+CREATE OR ALTER PROCEDURE dbo.sp_TeploDB_FullBackup
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    DECLARE @BackupPath NVARCHAR(500);
+    DECLARE @FileName NVARCHAR(500);
+    DECLARE @BackupDate NVARCHAR(20);
+    DECLARE @IsLastOfMonth INT;
+    DECLARE @ArchivePath NVARCHAR(500);
+    
+    -- Формирование имени файла
+    SET @BackupDate = FORMAT(GETDATE(), 'yyyyMMdd');
+    SET @FileName = N'D:\Backups\TeploDB\Full\TeploDB_Full_' + @BackupDate + N'.bak';
+    
+    -- Проверка, является ли сегодня последним днём месяца
+    SET @IsLastOfMonth = CASE 
+        WHEN DAY(GETDATE()) = DAY(EOMONTH(GETDATE())) THEN 1 
+        ELSE 0 
+    END;
+    
+    BEGIN TRY
+        -- Создание полной копии
+        BACKUP DATABASE [TeploDB]
+        TO DISK = @FileName
+        WITH 
+            NAME = N'TeploDB-Full Backup',
+            DESCRIPTION = N'Полное резервное копирование базы данных Тепло',
+            COMPRESSION,
+            STATS = 10,
+            CHECKSUM,
+            INIT;
+        
+        -- Логирование успешного бэкапа
+        INSERT INTO dbo.BackupHistory (BackupDate, BackupType, Status, FileName, SizeBytes)
+        VALUES (GETDATE(), 'Full', 'Success', @FileName, 
+                (SELECT CAST(size AS BIGINT) * 8 FROM sys.master_files WHERE name = 'TeploDB'));
+        
+        -- Если последний день месяца - копируем в архив
+        IF @IsLastOfMonth = 1
+        BEGIN
+            SET @ArchivePath = N'D:\Backups\TeploDB\Archive\TeploDB_Full_' + @BackupDate + N'_Archive.bak';
+            
+            -- Копирование файла в архив
+            DECLARE @CopyCmd NVARCHAR(1000);
+            SET @CopyCmd = N'copy "' + @FileName + N'" "' + @ArchivePath + N'"';
+            EXEC xp_cmdshell @CopyCmd;
+        END
+        
+        -- Удаление старых полных бэкапов (старше 30 дней, кроме архивных)
+        DECLARE @DeleteDate DATE = DATEADD(DAY, -30, GETDATE());
+        EXEC dbo.sp_DeleteOldBackups @Path = N'D:\Backups\TeploDB\Full\', 
+                                      @Extension = N'bak', 
+                                      @OlderThan = @DeleteDate;
+    END TRY
+    BEGIN CATCH
+        INSERT INTO dbo.BackupHistory (BackupDate, BackupType, Status, ErrorMessage)
+        VALUES (GETDATE(), 'Full', 'Failed', ERROR_MESSAGE());
+        
+        THROW;
+    END CATCH
+END;
+GO
+
+CREATE OR ALTER PROCEDURE dbo.sp_TeploDB_DiffBackup
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    DECLARE @FileName NVARCHAR(500);
+    DECLARE @BackupDate NVARCHAR(20);
+    
+    SET @BackupDate = FORMAT(GETDATE(), 'yyyyMMdd');
+    SET @FileName = N'D:\Backups\TeploDB\Diff\TeploDB_Diff_' + @BackupDate + N'.bak';
+    
+    BEGIN TRY
+        BACKUP DATABASE [TeploDB]
+        TO DISK = @FileName
+        WITH 
+            DIFFERENTIAL,
+            NAME = N'TeploDB-Differential Backup',
+            COMPRESSION,
+            STATS = 10,
+            CHECKSUM,
+            INIT;
+        
+        INSERT INTO dbo.BackupHistory (BackupDate, BackupType, Status, FileName)
+        VALUES (GETDATE(), 'Differential', 'Success', @FileName);
+        
+        -- Удаление старых дифференциальных бэкапов (старше 7 дней)
+        DECLARE @DeleteDate DATE = DATEADD(DAY, -7, GETDATE());
+        EXEC dbo.sp_DeleteOldBackups @Path = N'D:\Backups\TeploDB\Diff\', 
+                                      @Extension = N'bak', 
+                                      @OlderThan = @DeleteDate;
+        
+        -- Очистка старых логов (после успешного дифференциального бэкапа)
+        EXEC dbo.sp_CleanOldLogs;
+    END TRY
+    BEGIN CATCH
+        INSERT INTO dbo.BackupHistory (BackupDate, BackupType, Status, ErrorMessage)
+        VALUES (GETDATE(), 'Differential', 'Failed', ERROR_MESSAGE());
+        
+        THROW;
+    END CATCH
+END;
+GO
+
+CREATE OR ALTER PROCEDURE dbo.sp_TeploDB_LogBackup
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    DECLARE @FileName NVARCHAR(500);
+    DECLARE @BackupDateTime NVARCHAR(50);
+    
+    SET @BackupDateTime = FORMAT(GETDATE(), 'yyyyMMdd_HHmmss');
+    SET @FileName = N'D:\Backups\TeploDB\Logs\TeploDB_Log_' + @BackupDateTime + N'.trn';
+    
+    BEGIN TRY
+        BACKUP LOG [TeploDB]
+        TO DISK = @FileName
+        WITH 
+            NAME = N'TeploDB-Transaction Log Backup',
+            COMPRESSION,
+            STATS = 5,
+            CHECKSUM,
+            INIT;
+        
+        INSERT INTO dbo.BackupHistory (BackupDate, BackupType, Status, FileName)
+        VALUES (GETDATE(), 'Log', 'Success', @FileName);
+        
+        -- Удаление старых логов (старше 2 дней)
+        DECLARE @DeleteDate DATE = DATEADD(DAY, -2, GETDATE());
+        EXEC dbo.sp_DeleteOldBackups @Path = N'D:\Backups\TeploDB\Logs\', 
+                                      @Extension = N'trn', 
+                                      @OlderThan = @DeleteDate;
+    END TRY
+    BEGIN CATCH
+        INSERT INTO dbo.BackupHistory (BackupDate, BackupType, Status, ErrorMessage)
+        VALUES (GETDATE(), 'Log', 'Failed', ERROR_MESSAGE());
+        
+        THROW;
+    END CATCH
+END;
+GO
+
+-- Таблица для логирования бэкапов
+CREATE TABLE dbo.BackupHistory (
+    IdBackup INT IDENTITY(1,1) PRIMARY KEY,
+    BackupDate DATETIME NOT NULL DEFAULT GETDATE(),
+    BackupType NVARCHAR(20) NOT NULL CHECK (BackupType IN ('Full', 'Differential', 'Log')),
+    Status NVARCHAR(20) NOT NULL CHECK (Status IN ('Success', 'Failed', 'Verified')),
+    FileName NVARCHAR(500) NULL,
+    SizeBytes BIGINT NULL,
+    DurationSeconds INT NULL,
+    ErrorMessage NVARCHAR(MAX) NULL
+);
+GO
+
+-- Процедура удаления старых бэкапов
+CREATE OR ALTER PROCEDURE dbo.sp_DeleteOldBackups
+    @Path NVARCHAR(500),
+    @Extension NVARCHAR(10),
+    @OlderThan DATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    DECLARE @DeleteCmd NVARCHAR(1000);
+    DECLARE @DateStr NVARCHAR(20) = FORMAT(@OlderThan, 'yyyyMMdd');
+    
+    -- Удаление файлов старше указанной даты
+    SET @DeleteCmd = N'forfiles /P "' + @Path + N'" /M *.' + @Extension + 
+                     N' /D -' + CAST(DATEDIFF(DAY, @OlderThan, GETDATE()) AS NVARCHAR(10)) + 
+                     N' /C "cmd /c del @file"';
+    
+    EXEC xp_cmdshell @DeleteCmd;
+END;
+GO
+
+-- Процедура очистки старых логов
+CREATE OR ALTER PROCEDURE dbo.sp_CleanOldLogs
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    -- Очистка журнала транзакций после успешного дифференциального бэкапа
+    DBCC SHRINKFILE (TeploDB_Log, 100);  -- Уменьшаем до 100 MB
+    
+    INSERT INTO dbo.BackupHistory (BackupDate, BackupType, Status, FileName)
+    VALUES (GETDATE(), 'Maintenance', 'Success', 'Log file shrunk');
+END;
+GO

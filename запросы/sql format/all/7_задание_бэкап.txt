@@ -1,0 +1,157 @@
+USE msdb;
+GO
+
+-- =====================================================
+-- ЗАДАНИЕ 1: Полное резервное копирование (еженедельно)
+-- =====================================================
+EXEC dbo.sp_add_job
+    @job_name = N'TeploDB_FullBackup',
+    @enabled = 1,
+    @description = N'Еженедельное полное резервное копирование базы данных Тепло (воскресенье, 02:00)',
+    @category_name = N'Database Maintenance';
+GO
+
+EXEC dbo.sp_add_jobstep
+    @job_name = N'TeploDB_FullBackup',
+    @step_name = N'Full Backup',
+    @step_id = 1,
+    @command = N'EXEC dbo.sp_TeploDB_FullBackup;',
+    @database_name = N'TeploDB',
+    @on_success_action = 1,
+    @on_fail_action = 2;
+GO
+
+EXEC dbo.sp_add_schedule
+    @schedule_name = N'Weekly_Sunday_2AM',
+    @enabled = 1,
+    @freq_type = 8,           -- еженедельно
+    @freq_interval = 1,       -- воскресенье (1)
+    @freq_subday_type = 1,
+    @freq_subday_interval = 0,
+    @active_start_time = 020000;  -- 02:00:00
+GO
+
+EXEC dbo.sp_attach_schedule
+    @job_name = N'TeploDB_FullBackup',
+    @schedule_name = N'Weekly_Sunday_2AM';
+GO
+
+EXEC dbo.sp_add_jobserver
+    @job_name = N'TeploDB_FullBackup',
+    @server_name = N'(local)';
+GO
+
+-- =====================================================
+-- ЗАДАНИЕ 2: Дифференциальное копирование (ежедневно)
+-- =====================================================
+EXEC dbo.sp_add_job
+    @job_name = N'TeploDB_DiffBackup',
+    @enabled = 1,
+    @description = N'Ежедневное дифференциальное резервное копирование (23:00)',
+    @category_name = N'Database Maintenance';
+GO
+
+EXEC dbo.sp_add_jobstep
+    @job_name = N'TeploDB_DiffBackup',
+    @step_name = N'Differential Backup',
+    @step_id = 1,
+    @command = N'EXEC dbo.sp_TeploDB_DiffBackup;',
+    @database_name = N'TeploDB';
+GO
+
+EXEC dbo.sp_add_schedule
+    @schedule_name = N'Daily_11PM',
+    @enabled = 1,
+    @freq_type = 4,           -- ежедневно
+    @freq_interval = 1,
+    @active_start_time = 230000;  -- 23:00:00
+GO
+
+EXEC dbo.sp_attach_schedule
+    @job_name = N'TeploDB_DiffBackup',
+    @schedule_name = N'Daily_11PM';
+GO
+
+EXEC dbo.sp_add_jobserver
+    @job_name = N'TeploDB_DiffBackup',
+    @server_name = N'(local)';
+GO
+
+-- =====================================================
+-- ЗАДАНИЕ 3: Копирование журнала транзакций (каждые 30 минут)
+-- =====================================================
+EXEC dbo.sp_add_job
+    @job_name = N'TeploDB_LogBackup',
+    @enabled = 1,
+    @description = N'Резервное копирование журнала транзакций каждые 30 минут',
+    @category_name = N'Database Maintenance';
+GO
+
+EXEC dbo.sp_add_jobstep
+    @job_name = N'TeploDB_LogBackup',
+    @step_name = N'Transaction Log Backup',
+    @step_id = 1,
+    @command = N'EXEC dbo.sp_TeploDB_LogBackup;',
+    @database_name = N'TeploDB';
+GO
+
+EXEC dbo.sp_add_schedule
+    @schedule_name = N'Every_30_Minutes',
+    @enabled = 1,
+    @freq_type = 4,                -- ежедневно
+    @freq_interval = 1,
+    @freq_subday_type = 4,         -- каждые X минут
+    @freq_subday_interval = 30,    -- 30 минут
+    @active_start_time = 0;        -- круглосуточно
+GO
+
+EXEC dbo.sp_attach_schedule
+    @job_name = N'TeploDB_LogBackup',
+    @schedule_name = N'Every_30_Minutes';
+GO
+
+EXEC dbo.sp_add_jobserver
+    @job_name = N'TeploDB_LogBackup',
+    @server_name = N'(local)';
+GO
+
+-- =====================================================
+-- ЗАДАНИЕ 4: Очистка старых архивов (ежемесячно)
+-- =====================================================
+EXEC dbo.sp_add_job
+    @job_name = N'TeploDB_CleanArchive',
+    @enabled = 1,
+    @description = N'Удаление архивных копий старше 1 года',
+    @category_name = N'Database Maintenance';
+GO
+
+EXEC dbo.sp_add_jobstep
+    @job_name = N'TeploDB_CleanArchive',
+    @step_name = N'Clean Archive',
+    @step_id = 1,
+    @command = N'
+        DECLARE @DeleteDate DATE = DATEADD(YEAR, -1, GETDATE());
+        EXEC dbo.sp_DeleteOldBackups @Path = N''D:\Backups\TeploDB\Archive\'', 
+                                      @Extension = N''bak'', 
+                                      @OlderThan = @DeleteDate;
+    ',
+    @database_name = N'TeploDB';
+GO
+
+EXEC dbo.sp_add_schedule
+    @schedule_name = N'Monthly_1stDay_3AM',
+    @enabled = 1,
+    @freq_type = 16,              -- ежемесячно
+    @freq_interval = 1,           -- 1-й день месяца
+    @active_start_time = 030000;  -- 03:00:00
+GO
+
+EXEC dbo.sp_attach_schedule
+    @job_name = N'TeploDB_CleanArchive',
+    @schedule_name = N'Monthly_1stDay_3AM';
+GO
+
+EXEC dbo.sp_add_jobserver
+    @job_name = N'TeploDB_CleanArchive',
+    @server_name = N'(local)';
+GO
